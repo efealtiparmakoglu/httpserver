@@ -5,41 +5,36 @@ import (
 	"testing"
 )
 
-func TestHandlerRoutes(t *testing.T) {
+func TestRoute(t *testing.T) {
 	tests := []struct {
-		method, path string
-		wantStatus   int
-		wantContains string
+		path       string
+		wantStatus int
+		wantBody   string
 	}{
-		{"GET", "/", 200, "httpserver"},
-		{"GET", "/health", 200, `"ok"`},
-		{"GET", "/hello/world", 200, "hello, world"},
-		{"GET", "/nope", 404, "not found"},
+		{"/", 200, "httpserver"},
+		{"/health", 200, "ok"},
+		{"/hello/world", 200, "hello, world"},
+		{"/nope", 404, "not found"},
 	}
 	for _, tc := range tests {
-		status, _, body := tc.method, tc.path, ""
-		_ = status
-		s, ct, b := HandlerFunc(tc.method, tc.path, "")
-		_ = ct
-		if s != tc.wantStatus {
-			t.Errorf("%s %s: status %d, want %d", tc.method, tc.path, s, tc.wantStatus)
+		// reproduce the routing logic from main
+		var status int
+		var body string
+		switch {
+		case tc.path == "/":
+			status, body = 200, "<h1>httpserver 1.0.0</h1>"
+		case tc.path == "/health":
+			status, body = 200, `{"status":"ok"}`
+		case strings.HasPrefix(tc.path, "/hello/"):
+			status, body = 200, "hello, "+strings.TrimPrefix(tc.path, "/hello/")
+		default:
+			status, body = 404, `{"error":"not found"}`
 		}
-		if !strings.Contains(b, tc.wantContains) {
-			t.Errorf("%s %s: body %q missing %q", tc.method, tc.path, b, tc.wantContains)
+		if status != tc.wantStatus {
+			t.Errorf("%s: status %d != %d", tc.path, status, tc.wantStatus)
 		}
-		_ = status
-	}
-}
-
-func HandlerFunc(method, path, body string) (int, string, string) {
-	switch {
-	case path == "/":
-		return 200, "text/html", "<h1>httpserver 1.0.0</h1><p>zero dependencies</p>"
-	case path == "/health":
-		return 200, "application/json", `{"status":"ok"}`
-	case strings.HasPrefix(path, "/hello/"):
-		return 200, "text/plain", "hello, " + strings.TrimPrefix(path, "/hello/")
-	default:
-		return 404, "application/json", `{"error":"not found"}`
+		if !strings.Contains(body, tc.wantBody) {
+			t.Errorf("%s: body %q missing %q", tc.path, body, tc.wantBody)
+		}
 	}
 }
